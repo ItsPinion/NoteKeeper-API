@@ -7,6 +7,7 @@ import {
 } from "drizzle-orm/mysql-core";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
+import { Note, Result } from "./types";
 
 const tableName = "notes";
 
@@ -16,9 +17,7 @@ export const notesSchema = mysqlTable(tableName, {
   date: datetime("date").notNull(),
 });
 
-export type Note = typeof notesSchema.$inferSelect;
-
-export async function createNote(newNote: Partial<Note>) {
+export async function createNote(newNote: Partial<Note>): Promise<Result> {
   if (!newNote.date || !newNote.text) {
     throw new Error("note date & text required");
   }
@@ -26,10 +25,10 @@ export async function createNote(newNote: Partial<Note>) {
     text: newNote.text,
     date: newNote.date,
   });
-  return { message: "success" };
+  return { success: true, message: "The note has been added successfully" };
 }
 
-export async function getOneNote(id: number) {
+export async function readNote(id: number): Promise<Note> {
   const result = await db
     .select()
     .from(notesSchema)
@@ -37,7 +36,10 @@ export async function getOneNote(id: number) {
   return result[0];
 }
 
-export async function updateNote(id: number, newNote: Partial<Note>) {
+export async function updateNote(
+  id: number,
+  newNote: Partial<Note>
+): Promise<Result> {
   if (!newNote.date || !newNote.text) {
     throw new Error("note date & text required");
   }
@@ -46,15 +48,15 @@ export async function updateNote(id: number, newNote: Partial<Note>) {
     .update(notesSchema)
     .set({ id: id, text: newNote.text, date: newNote.date })
     .where(eq(notesSchema.id, id));
-  return { message: "successfully updated" };
+  return { success: true, message: "The note has been updated successfully" };
 }
 
-export async function deleteNote(id: number) {
+export async function deleteNote(id: number): Promise<Result> {
   await db.delete(notesSchema).where(eq(notesSchema.id, id));
-  return { message: "successfully deleted" };
+  return { success: true, message: "The note has been deleted successfully" };
 }
 
-export async function getAll() {
+export async function listNote(): Promise<Note[]> {
   const result: Note[] = await db.select().from(notesSchema);
   return result;
 }

@@ -1,3 +1,6 @@
+import { createNote, readNote, updateNote, deleteNote, listNote } from "./note";
+import { createNoteSchema, idSchema } from "./schema";
+import { Note, Result } from "./types";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { basicAuth } from "hono/basic-auth";
@@ -8,14 +11,6 @@ import { timing } from "hono/timing";
 import { logger } from "hono/logger";
 import { prettyJSON } from "hono/pretty-json";
 import { secureHeaders } from "hono/secure-headers";
-import {
-  Note,
-  createNote,
-  deleteNote,
-  getAll,
-  getOneNote,
-  updateNote,
-} from "./note";
 
 const app = new Hono();
 
@@ -42,25 +37,58 @@ const app = new Hono();
 ////////////////////////////////////////
 ///////////////   API   ////////////////
 ////////////////////////////////////////
+
+/*TODO: 1. DATA validation
+         2. Error handeling
+         3.
+ */
+
 {
   app.post("/", async (c) => {
     const data: Partial<Note> = await c.req.json();
 
-    const newNote = {
+    const validation = createNoteSchema.safeParse(data);
+
+    if (!validation.success) {
+      return c.json({ success: false, message: validation.error.issues[0] },400);
+    }
+
+    const newNote: Partial<Note> = {
       text: data.text,
       date: new Date(data.date || Date.now()),
     };
 
-    return c.json(await createNote(newNote));
+    let result:Result;
+
+    try {
+      result = await createNote(newNote);
+    } catch (error) {
+      return c.json({
+        success: false,
+        message: "The note could not be added successfully.",
+      },500);
+    }
+
+    return c.json(result);
   });
 
-  app.get("/:id", async (c) => c.json(await getOneNote(+c.req.param("id"))));
+  // app.get("/:id", async (c) => c.json(await readNote(+c.req.param("id"))));
+  app.get("/:id", async (c) => {
+    
+    const idValidation = idSchema.safeParse(+c.req.param("id"))
+
+    // if()
+
+
+
+  });
+
 
   app.put("/:id", async (c) => {
     const data: Partial<Note> = await c.req.json();
     const id = +c.req.param("id");
 
-    const note = await getOneNote(id);
+    const note = await readNote(id);
 
     const newNote: Partial<Note> = {
       text: data.text || note.text,
@@ -72,7 +100,7 @@ const app = new Hono();
 
   app.delete("/:id", async (c) => c.json(await deleteNote(+c.req.param("id"))));
 
-  app.get("/", async (c) => c.json(await getAll()));
+  app.get("/", async (c) => c.json(await listNote()));
 }
 
 serve(app);
