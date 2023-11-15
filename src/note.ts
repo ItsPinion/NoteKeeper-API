@@ -28,11 +28,20 @@ export async function createNote(newNote: Partial<Note>): Promise<Result> {
   return { success: true, message: "The note has been added successfully" };
 }
 
-export async function readNote(id: number): Promise<Note> {
+export async function readNotebyID(id: number): Promise<Note> {
   const result = await db
     .select()
     .from(notesSchema)
     .where(eq(notesSchema.id, id));
+  return result[0];
+}
+
+export async function readNotebyText(text: string): Promise<Note> {
+  const result = await db
+    .select()
+    .from(notesSchema)
+    .where(eq(notesSchema.text, text));
+
   return result[0];
 }
 
@@ -48,15 +57,15 @@ export async function updateNote(
     .update(notesSchema)
     .set({ id: id, text: newNote.text, date: newNote.date })
     .where(eq(notesSchema.id, id));
-  return { success: true, message: "The note has been updated successfully" };
+  return { success: true, message: "note has been updated successfully" };
 }
 
 export async function deleteNote(id: number): Promise<Result> {
   await db.delete(notesSchema).where(eq(notesSchema.id, id));
-  return { success: true, message: "The note has been deleted successfully" };
+  return { success: true, message: "note has been deleted successfully" };
 }
 
-export async function listNote(): Promise<Note[]> {
+export async function listNotes(): Promise<Note[]> {
   const result: Note[] = await db.select().from(notesSchema);
   return result;
 }

@@ -1,5 +1,12 @@
-import { createNote, readNote, updateNote, deleteNote, listNote } from "./note";
-import { createNoteSchema, idSchema } from "./schema";
+import {
+  createNote,
+  readNotebyID,
+  updateNote,
+  deleteNote,
+  listNotes,
+  readNotebyText,
+} from "./note";
+import { createNoteSchema, idSchema, updateNoteSchema } from "./schema";
 import { Note, Result } from "./types";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
@@ -38,69 +45,175 @@ const app = new Hono();
 ///////////////   API   ////////////////
 ////////////////////////////////////////
 
-/*TODO: 1. DATA validation
-         2. Error handeling
-         3.
- */
-
 {
   app.post("/", async (c) => {
     const data: Partial<Note> = await c.req.json();
-
-    const validation = createNoteSchema.safeParse(data);
-
-    if (!validation.success) {
-      return c.json({ success: false, message: validation.error.issues[0] },400);
-    }
 
     const newNote: Partial<Note> = {
       text: data.text,
       date: new Date(data.date || Date.now()),
     };
 
-    let result:Result;
+    const noteValidation = createNoteSchema.safeParse(newNote);
+
+    if (!noteValidation.success) {
+      return c.json(
+        { success: false, message: noteValidation.error.issues[0] },
+        400
+      );
+    }
+
+    let duplicate: Note;
 
     try {
-      result = await createNote(newNote);
+      duplicate = await readNotebyText(newNote.text as string);
     } catch (error) {
-      return c.json({
-        success: false,
-        message: "The note could not be added successfully.",
-      },500);
+      return c.json({ success: false, message: "Failed to access the database" }, 500);
+    }
+
+    if (duplicate) {
+      return c.json(
+        {
+          success: false,
+          message: `note already exists.`,
+          duplicateOf: duplicate,
+        },
+        400
+      );
+    }
+
+    try {
+      return c.json(await createNote(newNote));
+    } catch (error) {
+      return c.json({ success: false, message: "Failed to access the database" }, 500);
+    }
+  });
+
+  app.get("/:id", async (c) => {
+    const idValidation = idSchema.safeParse(+c.req.param("id"));
+
+    if (!idValidation.success) {
+      return c.json(
+        { success: false, message: idValidation.error.issues[0] },
+        400
+      );
+    }
+
+    let result: Note;
+
+    try {
+      result = await readNotebyID(idValidation.data);
+    } catch (error) {
+      return c.json({ success: false, message: "Failed to access the database" }, 500);
+    }
+
+    if (!result) {
+      return c.json({ success: false, message: "note does not exist" }, 404);
     }
 
     return c.json(result);
   });
 
-  // app.get("/:id", async (c) => c.json(await readNote(+c.req.param("id"))));
-  app.get("/:id", async (c) => {
-    
-    const idValidation = idSchema.safeParse(+c.req.param("id"))
-
-    // if()
-
-
-
-  });
-
-
   app.put("/:id", async (c) => {
-    const data: Partial<Note> = await c.req.json();
-    const id = +c.req.param("id");
+    const idValidation = idSchema.safeParse(+c.req.param("id"));
 
-    const note = await readNote(id);
+    if (!idValidation.success) {
+      return c.json(
+        { success: false, message: idValidation.error.issues[0] },
+        400
+      );
+    }
+
+    let note: Note;
+
+    try {
+      note = await readNotebyID(idValidation.data);
+    } catch (error) {
+      return c.json({ success: false, message: "Failed to access the database" }, 500);
+    }
+
+    if (!note) {
+      return c.json({ success: false, message: "note does not exist" }, 404);
+    }
+
+    const data: Partial<Note> = await c.req.json();
 
     const newNote: Partial<Note> = {
-      text: data.text || note.text,
+      text: data.text,
       date: new Date(data.date || note.date),
     };
 
-    return c.json(await updateNote(id, newNote));
+    const noteValidation = updateNoteSchema.safeParse(newNote);
+
+    if (!noteValidation.success) {
+      return c.json(
+        { success: false, message: noteValidation.error.issues[0] },
+        400
+      );
+    }
+
+    let duplicate: Note;
+
+    try {
+      duplicate = await readNotebyText(newNote.text as string);
+    } catch (error) {
+      return c.json({ success: false, message: "Failed to access the database" }, 500);
+    }
+
+    if (duplicate) {
+      return c.json(
+        {
+          success: false,
+          message: `note already exists.`,
+          duplicateOf: duplicate,
+        },
+        400
+      );
+    }
+
+    try {
+      return c.json(await updateNote(idValidation.data, newNote));
+    } catch (error) {
+      return c.json({ success: false, message: "Failed to access the database" }, 500);
+    }
   });
 
-  app.delete("/:id", async (c) => c.json(await deleteNote(+c.req.param("id"))));
+  app.delete("/:id", async (c) => {
+    const idValidation = idSchema.safeParse(+c.req.param("id"));
 
-  app.get("/", async (c) => c.json(await listNote()));
+    if (!idValidation.success) {
+      return c.json(
+        { success: false, message: idValidation.error.issues[0] },
+        400
+      );
+    }
+
+    let result: Note;
+
+    try {
+      result = await readNotebyID(idValidation.data);
+    } catch (error) {
+      return c.json({ success: false, message: "Failed to access the database" }, 500);
+    }
+
+    if (!result) {
+      return c.json({ success: false, message: "note does not exist" }, 404);
+    }
+
+    try {
+      return c.json(await deleteNote(idValidation.data));
+    } catch (error) {
+      return c.json({ success: false, message: "Failed to access the database" }, 500);
+    }
+  });
+
+  app.get("/", async (c) => {
+    try {
+      return c.json(await listNotes());
+    } catch (error) {
+      return c.json({ success: false, message: "Failed to access the database" }, 500);
+    }
+  });
 }
 
 serve(app);
