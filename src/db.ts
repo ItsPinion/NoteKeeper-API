@@ -6,7 +6,7 @@ const connection =  mysql.createPool({
   user: process.env.PMA_USER,
   database: process.env.MYSQL_DATABASE,
   password: process.env.MYSQL_ROOT_PASSWORD,
-  port: +(process.env.MYSQL_PORT || ""),
+  port: 3306,
 });
  
 export const db = drizzle(connection);

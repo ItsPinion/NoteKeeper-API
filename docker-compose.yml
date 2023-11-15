@@ -20,4 +20,4 @@ services:
       PMA_HOST: db
       PMA_USER: ${PMA_USER}
       PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      PMA_PORT: ${MYSQL_PORT}
+      PMA_PORT: 3306
