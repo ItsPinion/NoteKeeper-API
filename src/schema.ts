@@ -13,4 +13,12 @@ export const createNoteSchema = noteSchema.partial({
 
 export const updateNoteSchema = noteSchema.partial();
 
-export const idSchema = z.number().positive().int();
+export const paramSchema = z.number().positive().int();
+
+export const querySchema = z
+  .object({
+    limit: paramSchema,
+    page: paramSchema,
+    lastID: z.number().int().nonnegative(),
+  })
+  .partial();

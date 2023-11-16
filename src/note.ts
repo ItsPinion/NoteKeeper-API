@@ -6,14 +6,14 @@ import {
   datetime,
 } from "drizzle-orm/mysql-core";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, gt, sql } from "drizzle-orm";
 import { Note, Result } from "./types";
 
 const tableName = "notes";
 
 export const notesSchema = mysqlTable(tableName, {
   id: bigint("id", { mode: "number" }).primaryKey().autoincrement(),
-  text: varchar("phone", { length: 256 }).notNull(),
+  text: varchar("text", { length: 256 }).notNull(),
   date: datetime("date").notNull(),
 });
 
@@ -65,7 +65,26 @@ export async function deleteNote(id: number): Promise<Result> {
   return { success: true, message: "note has been deleted successfully" };
 }
 
-export async function listNotes(): Promise<Note[]> {
-  const result: Note[] = await db.select().from(notesSchema);
+export async function listNotes(
+  page: number,
+  lastID: number,
+  limit: number
+): Promise<Note[]> {
+  let result: Note[] = [];
+
+  if (lastID == 0) {
+    result = await db
+      .select()
+      .from(notesSchema)
+      .limit(limit)
+      .offset((page - 1) * limit);
+  } else {
+    result = await db
+      .select()
+      .from(notesSchema)
+      .limit(limit)
+      .where(gt(notesSchema.id, lastID));
+  }
+
   return result;
 }

@@ -6,7 +6,12 @@ import {
   listNotes,
   readNotebyText,
 } from "./note";
-import { createNoteSchema, idSchema, updateNoteSchema } from "./schema";
+import {
+  createNoteSchema,
+  paramSchema,
+  querySchema,
+  updateNoteSchema,
+} from "./schema";
 import { Note, Result } from "./types";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
@@ -21,9 +26,6 @@ import { secureHeaders } from "hono/secure-headers";
 
 const app = new Hono();
 
-////////////////////////////////////////
-////////////   Middleware   ////////////
-////////////////////////////////////////
 {
   app.use(
     "*",
@@ -34,16 +36,12 @@ const app = new Hono();
   );
   app.use("*", compress());
   app.use("*", cors());
-  app.use("*", etag());
+  // app.use("*", etag());
   app.use("*", timing());
   app.use("*", logger());
   app.use("*", prettyJSON());
   app.use("*", secureHeaders());
 }
-
-////////////////////////////////////////
-///////////////   API   ////////////////
-////////////////////////////////////////
 
 {
   app.post("/", async (c) => {
@@ -68,7 +66,10 @@ const app = new Hono();
     try {
       duplicate = await readNotebyText(newNote.text as string);
     } catch (error) {
-      return c.json({ success: false, message: "Failed to access the database" }, 500);
+      return c.json(
+        { success: false, message: "Failed to access the database" },
+        500
+      );
     }
 
     if (duplicate) {
@@ -85,12 +86,15 @@ const app = new Hono();
     try {
       return c.json(await createNote(newNote));
     } catch (error) {
-      return c.json({ success: false, message: "Failed to access the database" }, 500);
+      return c.json(
+        { success: false, message: "Failed to access the database" },
+        500
+      );
     }
   });
 
   app.get("/:id", async (c) => {
-    const idValidation = idSchema.safeParse(+c.req.param("id"));
+    const idValidation = paramSchema.safeParse(+c.req.param("id"));
 
     if (!idValidation.success) {
       return c.json(
@@ -104,7 +108,10 @@ const app = new Hono();
     try {
       result = await readNotebyID(idValidation.data);
     } catch (error) {
-      return c.json({ success: false, message: "Failed to access the database" }, 500);
+      return c.json(
+        { success: false, message: "Failed to access the database" },
+        500
+      );
     }
 
     if (!result) {
@@ -115,7 +122,7 @@ const app = new Hono();
   });
 
   app.put("/:id", async (c) => {
-    const idValidation = idSchema.safeParse(+c.req.param("id"));
+    const idValidation = paramSchema.safeParse(+c.req.param("id"));
 
     if (!idValidation.success) {
       return c.json(
@@ -129,7 +136,10 @@ const app = new Hono();
     try {
       note = await readNotebyID(idValidation.data);
     } catch (error) {
-      return c.json({ success: false, message: "Failed to access the database" }, 500);
+      return c.json(
+        { success: false, message: "Failed to access the database" },
+        500
+      );
     }
 
     if (!note) {
@@ -157,7 +167,10 @@ const app = new Hono();
     try {
       duplicate = await readNotebyText(newNote.text as string);
     } catch (error) {
-      return c.json({ success: false, message: "Failed to access the database" }, 500);
+      return c.json(
+        { success: false, message: "Failed to access the database" },
+        500
+      );
     }
 
     if (duplicate) {
@@ -174,12 +187,15 @@ const app = new Hono();
     try {
       return c.json(await updateNote(idValidation.data, newNote));
     } catch (error) {
-      return c.json({ success: false, message: "Failed to access the database" }, 500);
+      return c.json(
+        { success: false, message: "Failed to access the database" },
+        500
+      );
     }
   });
 
   app.delete("/:id", async (c) => {
-    const idValidation = idSchema.safeParse(+c.req.param("id"));
+    const idValidation = paramSchema.safeParse(+c.req.param("id"));
 
     if (!idValidation.success) {
       return c.json(
@@ -193,7 +209,10 @@ const app = new Hono();
     try {
       result = await readNotebyID(idValidation.data);
     } catch (error) {
-      return c.json({ success: false, message: "Failed to access the database" }, 500);
+      return c.json(
+        { success: false, message: "Failed to access the database" },
+        500
+      );
     }
 
     if (!result) {
@@ -203,16 +222,42 @@ const app = new Hono();
     try {
       return c.json(await deleteNote(idValidation.data));
     } catch (error) {
-      return c.json({ success: false, message: "Failed to access the database" }, 500);
+      return c.json(
+        { success: false, message: "Failed to access the database" },
+        500
+      );
     }
   });
 
   app.get("/", async (c) => {
-    try {
-      return c.json(await listNotes());
-    } catch (error) {
-      return c.json({ success: false, message: "Failed to access the database" }, 500);
+    const query = {
+      page: +(c.req.query("page") || "1"),
+      lastID: +(c.req.query("lastID") || "0"),
+      limit: +(c.req.query("limit") || "10"),
+    };
+
+    const queryValidation = querySchema.safeParse(query);
+
+    if (!queryValidation.success) {
+      return c.json(queryValidation.error.issues[0], 400);
     }
+
+    let result: Note[];
+
+    try {
+      result = await listNotes(query.page, query.lastID, query.limit);
+    } catch (error) {
+      return c.json(
+        { success: false, message: "Failed to access the database" },
+        500
+      );
+    }
+
+    if (result.length < 1) {
+      return c.json({ success: false, message: "nothing to see here :)" }, 404);
+    }
+
+    return c.json(result);
   });
 }
 
