@@ -13,7 +13,7 @@ import {
   updateNoteSchema,
 } from "./schema";
 import { Note, Result } from "./types";
-import { serve } from "@hono/node-server";
+import { getRequestListener, serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { basicAuth } from "hono/basic-auth";
 import { compress } from "hono/compress";
@@ -23,6 +23,8 @@ import { timing } from "hono/timing";
 import { logger } from "hono/logger";
 import { prettyJSON } from "hono/pretty-json";
 import { secureHeaders } from "hono/secure-headers";
+import { createServer } from "node:http";
+import { rateLimit } from "./rate-limit";
 
 const app = new Hono();
 
@@ -261,4 +263,18 @@ const app = new Hono();
   });
 }
 
-serve(app);
+serve({
+  fetch: app.fetch,
+  createServer: () => {
+    const rateLimiter = rateLimit();
+
+    const server = createServer((req, res) => {
+      if (rateLimiter.passed({ req, res })) {
+        const requestListener = getRequestListener(app.fetch);
+        requestListener(req, res);
+      }
+    });
+
+    return server;
+  },
+});
